@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Harbor — Open World Crime</title>
+<script type="importmap">
+{"imports": {"three": "./vendor/three.module.min.js"}}
+</script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1020;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #fff;
+    -webkit-user-select: none; user-select: none; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .hud { position: fixed; z-index: 5; pointer-events: none; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+  #topLeft { top: 14px; left: 16px; }
+  #cash { font-size: 30px; font-weight: 800; color: #7dff9e; letter-spacing: 1px; }
+  #stars { font-size: 26px; letter-spacing: 4px; margin-top: 2px; color: #ffd23e; min-height: 32px; }
+  #stars .off { color: rgba(255,255,255,.28); }
+  #topRight { top: 14px; right: 16px; text-align: right; }
+  #minimap { width: 188px; height: 188px; border: 2px solid rgba(255,255,255,.55);
+    border-radius: 10px; background: #101c2e; box-shadow: 0 4px 18px rgba(0,0,0,.55); }
+  #clock { font-size: 15px; font-weight: 700; margin-top: 4px; color: #ffe9a8; }
+  #bottomLeft { left: 16px; bottom: 16px; width: 260px; }
+  .barOuter { height: 18px; border: 2px solid rgba(255,255,255,.6); border-radius: 9px;
+    background: rgba(0,0,0,.45); overflow: hidden; }
+  #healthBar { height: 100%; width: 100%; background: linear-gradient(90deg,#ff5a5a,#ff9a3d); }
+  #healthLabel { font-size: 13px; font-weight: 700; margin-top: 3px; }
+  #ammoLine { font-size: 15px; font-weight: 700; margin-top: 6px; color: #ffd23e; }
+  #speedLine { font-size: 22px; font-weight: 800; margin-top: 2px; color: #9be7ff; }
+  #objective { left: 50%; transform: translateX(-50%); top: 14px; text-align: center; max-width: 560px; }
+  #objTitle { font-size: 15px; font-weight: 800; color: #ffd23e; letter-spacing: 2px; text-transform: uppercase; }
+  #objText { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  #objDist { font-size: 14px; font-weight: 700; color: #9be7ff; margin-top: 1px; }
+  #toast { left: 50%; transform: translateX(-50%); bottom: 120px; font-size: 24px; font-weight: 800;
+    color: #7dff9e; opacity: 0; transition: opacity .3s; text-align: center; white-space: nowrap; }
+  #hint { left: 50%; transform: translateX(-50%); bottom: 24px; font-size: 14px; font-weight: 600;
+    color: rgba(255,255,255,.85); background: rgba(0,0,0,.35); padding: 5px 12px; border-radius: 14px; }
+  #crosshair { left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 22px; color: #fff;
+    display: none; }
+  #damage { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.55) 100%); }
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(160deg, rgba(8,12,30,.55), rgba(40,10,40,.5)); }
+  .overlay h1 { font-size: 64px; margin: 0; letter-spacing: 6px; font-weight: 900;
+    background: linear-gradient(90deg, #ff5ea8, #ffd23e, #39d5ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 14px rgba(0,0,0,.8)); }
+  .overlay h2 { font-size: 20px; margin: 8px 0 0; color: #ffe9a8; letter-spacing: 3px; font-weight: 700; }
+  .overlay p { font-size: 16px; line-height: 1.7; color: #e8ecf5; max-width: 640px; margin: 18px 0 0; }
+  .overlay .keys { font-size: 14px; color: #b9c6dd; }
+  .overlay button { pointer-events: auto; cursor: pointer; margin-top: 26px; font-size: 20px; font-weight: 800;
+    letter-spacing: 2px; color: #10131c; background: linear-gradient(90deg, #ffd23e, #ff9a3d);
+    border: none; border-radius: 12px; padding: 14px 42px; box-shadow: 0 6px 24px rgba(255,160,40,.45); }
+  .overlay button:hover { transform: translateY(-2px); }
+  .overlay button.ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.6);
+    box-shadow: none; font-size: 16px; padding: 10px 28px; }
+  .hidden { display: none !important; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Neon Harbor: explore the city on foot and by car, steal cars, outrun the police and run missions"></canvas>
+<div id="damage"></div>
+<div class="hud" id="topLeft"><div id="cash">$0</div><div id="stars"></div></div>
+<div class="hud" id="topRight"><canvas id="minimap" width="188" height="188"></canvas><div id="clock">DAY 1 · 09:00</div></div>
+<div class="hud" id="objective"><div id="objTitle"></div><div id="objText"></div><div id="objDist"></div></div>
+<div class="hud" id="bottomLeft">
+  <div class="barOuter"><div id="healthBar"></div></div>
+  <div id="healthLabel">HEALTH 100</div>
+  <div id="ammoLine">PISTOL — 12 / 12</div>
+  <div id="speedLine"></div>
+</div>
+<div class="hud" id="toast"></div>
+<div class="hud" id="hint"></div>
+<div class="hud" id="crosshair">+</div>
+
+<div class="overlay" id="titleScreen">
+  <h1>NEON HARBOR</h1>
+  <h2>AN OPEN-WORLD CRIME STORY</h2>
+  <p>You are <b>Rook</b>, an ex-courier back in Neon Harbor with empty pockets and a fast temper.
+  The fixer <b>Marina</b> has five jobs for you — if the Harbor PD doesn't catch you first.
+  Steal cars, outrun the law, and take the harbor for yourself.</p>
+  <p class="keys">WASD move &nbsp;·&nbsp; SHIFT run &nbsp;·&nbsp; E enter / steal car &nbsp;·&nbsp; SPACE punch &nbsp;·&nbsp; CLICK shoot &nbsp;·&nbsp; R reload &nbsp;·&nbsp; DRAG look &nbsp;·&nbsp; ESC pause</p>
+  <button id="btnStart">START ENGINE</button>
+  <button class="ghost hidden" id="btnContinue">CONTINUE — SAVED GAME</button>
+</div>
+
+<div class="overlay hidden" id="pauseScreen">
+  <h1>PAUSED</h1>
+  <p>Neon Harbor waits for no one. Well — right now it does.</p>
+  <button id="btnResume">RESUME</button>
+  <button class="ghost" id="btnQuitTitle">SAVE &amp; QUIT TO TITLE</button>
+</div>
+
+<div class="overlay hidden" id="endScreen">
+  <h1 id="endTitle">BUSTED</h1>
+  <h2 id="endSub"></h2>
+  <p id="endText"></p>
+  <button id="btnRespawn">BACK ON THE STREETS</button>
+  <button class="ghost" id="btnEndTitle">QUIT TO TITLE</button>
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
